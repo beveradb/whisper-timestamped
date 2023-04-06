@@ -1948,6 +1948,22 @@ def write_csv(transcript, file, sep = ",", text_first=True, format_timestamps=No
             [[format_timestamps(segment["start"]), format_timestamps(segment["end"]), segment["text"].strip()] for segment in transcript]
         )
 
+def write_lrc(result, file):
+
+    for i, segment in enumerate(result, start=1):
+        total_seconds = segment['start']
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        hundredths = int((total_seconds * 100) % 100)
+
+        # write lrc lines
+        print(
+            f"[{minutes:02d}:{seconds:02d}.{hundredths:02d}]"
+            f"{segment['text'].strip()}",
+            file=file,
+            flush=True,
+        )
+
 # https://stackoverflow.com/questions/66588715/runtimeerror-cudnn-error-cudnn-status-not-initialized-using-pytorch
 # CUDA initialization may fail on old GPU card
 def force_cudnn_initialization(device=None, s=32):
@@ -2141,7 +2157,7 @@ def cli():
     parser.add_argument("--model_dir", default=None, help="the path to save model files; uses ~/.cache/whisper by default", type=str)
     parser.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu", help="device to use for PyTorch inference")
     parser.add_argument("--output_dir", "-o", default=None, help="directory to save the outputs", type=str)
-    valid_formats = ["txt", "vtt", "srt", "tsv", "csv", "json"]
+    valid_formats = ["txt", "vtt", "srt", "lrc", "tsv", "csv", "json"]
     def str2output_formats(string):
         if string == "all":
             return valid_formats
@@ -2150,7 +2166,7 @@ def cli():
             if format not in valid_formats:
                 raise ValueError(f"Expected one of {valid_formats}, got {format}")
         return formats
-    parser.add_argument("--output_format", "-f", default="all", help=f"Format(s) of the output file(s). Possible formats are: {', '.join(valid_formats)}. Several formats can be specified by using commas (ex: \"json,vtt,srt\"). By default (\"all\"), all available formats will be produced", type=str2output_formats)
+    parser.add_argument("--output_format", "-f", default="all", help=f"Format(s) of the output file(s). Possible formats are: {', '.join(valid_formats)}. Several formats can be specified by using commas (ex: \"json,vtt,srt,lrc\"). By default (\"all\"), all available formats will be produced", type=str2output_formats)
 
     parser.add_argument("--task", default="transcribe", help="whether to perform X->X speech recognition ('transcribe') or X->English translation ('translate')", choices=["transcribe", "translate"], type=str)
     parser.add_argument('--language', help=f"language spoken in the audio, specify None to perform language detection.", choices=sorted(whisper.tokenizer.LANGUAGES.keys()) + sorted([k.title() for k in whisper.tokenizer.TO_LANGUAGE_CODE.keys()]), default=None)
@@ -2290,6 +2306,13 @@ def cli():
                     write_srt(remove_keys(result["segments"], "words"), file=srt)
                 with open(outname + ".words.srt", "w", encoding="utf-8") as srt:
                     write_srt(flatten(result["segments"], "words"), file=srt)
+
+            # save LRC
+            if "lrc" in output_format:
+                with open(outname + ".lrc", "w", encoding="utf-8") as lrc:
+                    write_lrc(remove_keys(result["segments"], "words"), file=lrc)
+                with open(outname + ".words.lrc", "w", encoding="utf-8") as lrc:
+                    write_lrc(flatten(result["segments"], "words"), file=lrc)
 
             # save CSV
             if "csv" in output_format:

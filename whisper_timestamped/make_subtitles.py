@@ -102,26 +102,43 @@ def write_srt(result, file):
             flush=True,
         )
 
+def write_lrc(result, file):
+    print(f'[re:MidiCo]\n', file=file, flush=True)
+
+    for i, segment in enumerate(result, start=1):
+        total_seconds = segment['start']
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        hundredths = int((total_seconds * 100) % 100)
+
+        # write lrc lines
+        print(
+            f"[{minutes:02d}:{seconds:02d}.{hundredths:02d}]"
+            f"{segment['text'].strip().replace('-->', '->')}\n",
+            file=file,
+            flush=True,
+        )
+
 def cli():
 
     import os
     import argparse
 
-    supported_formats = ["srt", "vtt"]
+    supported_formats = ["srt", "vtt", "lrc"]
 
     parser = argparse.ArgumentParser(
-        description='Convert .word.json transcription files (output of whisper_timestamped) to srt or vtt, being able to cut long segments',
+        description='Convert .word.json transcription files (output of whisper_timestamped) to srt, vtt or lrc, being able to cut long segments',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument('input', type=str, help='Input json file, or input folder')
-    parser.add_argument('output', type=str, help='Output srt or vtt file, or output folder')
+    parser.add_argument('output', type=str, help='Output srt, vtt or lrc file, or output folder')
     parser.add_argument('--max_length', default=200, help='Maximum length of a segment in characters', type=int)
     parser.add_argument('--format', type=str, default="all", help='Output format (if the output is a folder, i.e. not a file with an explicit extension)', choices= supported_formats + ["all"])
     args = parser.parse_args()
 
     if os.path.isdir(args.input) or not max([args.output.endswith(e) for e in supported_formats]):
         input_files = [f for f in os.listdir(args.input) if f.endswith(".words.json")] if os.path.isdir(args.input) else [os.path.basename(args.input)]
-        extensions = [args.format] if args.format != "all" else ["srt", "vtt"]
+        extensions = [args.format] if args.format != "all" else ["srt", "vtt", "lrc"]
         output_files = [[os.path.join(args.output, f[:-11] + "." + e) for e in extensions] for f in input_files]
         if os.path.isdir(args.input):
             input_files = [os.path.join(args.input, f) for f in input_files]
@@ -150,6 +167,9 @@ def cli():
             elif output.endswith(".vtt"):
                 with open(output, "w", encoding="utf-8") as f:
                     write_vtt(segments, file=f)
+            elif output.endswith(".lrc"):
+                with open(output, "w", encoding="utf-8") as f:
+                    write_lrc(segments, file=f)
             else:
                 raise RuntimeError(f"Unknown output format for {output}")
 
