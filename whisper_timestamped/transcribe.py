@@ -1948,21 +1948,37 @@ def write_csv(transcript, file, sep = ",", text_first=True, format_timestamps=No
             [[format_timestamps(segment["start"]), format_timestamps(segment["end"]), segment["text"].strip()] for segment in transcript]
         )
 
-def write_lrc(result, file):
+def write_lrc(segments, file):
+    print(f'[re:MidiCo]', file=file, flush=True)
 
-    for i, segment in enumerate(result, start=1):
-        total_seconds = segment['start']
-        minutes = int(total_seconds // 60)
-        seconds = int(total_seconds % 60)
-        hundredths = int((total_seconds * 100) % 100)
+    for segidx, segment in enumerate(segments, start=1):
+        print(f"Processing line {segidx} with text: {segment['text']}")
 
-        # write lrc lines
-        print(
-            f"[{minutes:02d}:{seconds:02d}.{hundredths:02d}]"
-            f"{segment['text'].strip()}",
-            file=file,
-            flush=True,
-        )
+        for wordidx, word in enumerate(segment['words'], start=1):
+            print(f"Writing word {wordidx}: {word['text']} at start: {word['start']} and end: {word['end']}")
+
+            word_length = word['end'] - word['start']
+
+            if word['start'] == 0.0:
+                word_length = 1
+
+            word_start_time_seconds = word['end'] - word_length
+
+            minutes = int(word_start_time_seconds // 60)
+            seconds = int(word_start_time_seconds % 60)
+            hundredths = int((word_start_time_seconds * 100) % 100)
+
+            word_text = f"{word['text']} "
+
+            if wordidx == 1:
+                word_text = f"/{word_text}"
+
+            print(
+                f"[{minutes:02d}:{seconds:02d}.{hundredths:03d}]"
+                f"1:{word_text}",
+                file=file,
+                flush=True,
+            )
 
 # https://stackoverflow.com/questions/66588715/runtimeerror-cudnn-error-cudnn-status-not-initialized-using-pytorch
 # CUDA initialization may fail on old GPU card
@@ -2309,10 +2325,8 @@ def cli():
 
             # save LRC
             if "lrc" in output_format:
-                with open(outname + ".lrc", "w", encoding="utf-8") as lrc:
-                    write_lrc(remove_keys(result["segments"], "words"), file=lrc)
-                with open(outname + ".words.lrc", "w", encoding="utf-8") as lrc:
-                    write_lrc(flatten(result["segments"], "words"), file=lrc)
+                with open(outname + ".midico.lrc", "w", encoding="utf-8") as lrc:
+                    write_lrc(result["segments"], file=lrc)
 
             # save CSV
             if "csv" in output_format:
